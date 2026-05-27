@@ -10,7 +10,8 @@
       "Bash(C:/Users/marin/Documents/Hailo/.hailo_venv/Scripts/python.exe -c \"from torch.nn.parallel import DataParallel, DistributedDataParallel; print\\('torch parallel OK'\\)\")",
       "Bash(C:/Users/marin/Documents/Hailo/.hailo_venv/Scripts/python.exe -c \"from ultralytics.utils.loss import v8DetectionLoss, BboxLoss; print\\('loss imports OK'\\)\")",
       "Bash(C:/Users/marin/Documents/Hailo/.hailo_venv/Scripts/python.exe -c \"from train_hailo import PHASE_CONFIG, LOSS_PRESETS, AUGMENTATION_PRESETS, CFG, get_phase_names; print\\('train_hailo imports OK'\\); print\\('Phases:', get_phase_names\\(\\)\\); print\\('Loss presets:', list\\(LOSS_PRESETS.keys\\(\\)\\)\\); print\\('Aug presets:', list\\(AUGMENTATION_PRESETS.keys\\(\\)\\)\\)\")",
-      "Bash(C:/Users/marin/Documents/Hailo/.hailo_venv/Scripts/python.exe train_hailo.py --help)"
+      "Bash(C:/Users/marin/Documents/Hailo/.hailo_venv/Scripts/python.exe train_hailo.py --help)",
+      "Bash(ls \"C:\\\\\\\\Users\\\\\\\\marin\\\\\\\\Documents\\\\\\\\Hailo\\\\\\\\yolov8s-robocup2A\\\\\\\\\")"
     ]
   }
 }
