@@ -1,0 +1,14 @@
+﻿path: C:/Users/marin/Documents/Hailo/Dataset
+train: images/train
+val: images/val
+test: images/test
+nc: 8
+names:
+  - robot
+  - ballon
+  - but
+  - poteau
+  - tag_bleu
+  - tag_rouge
+  - robot_rct
+  - humain
