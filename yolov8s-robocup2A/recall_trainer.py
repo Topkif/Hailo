@@ -188,7 +188,7 @@ class RecallFocusedDetectionLoss(v8DetectionLoss):
         )
 
         # Replace box loss with per-class version
-        self.bbox_loss = PerClassBboxLoss(self.bbox_loss.reg_max)
+        self.bbox_loss = PerClassBboxLoss(self.reg_max)
         device = next(model.parameters()).device
         self.bbox_loss.set_box_weights(device)
 
@@ -261,6 +261,16 @@ class RecallFocusedTrainer(DetectionTrainer):
     """
 
     def __init__(self, *args, **kwargs):
+        # Pop custom keys before ultralytics validates the kwargs dict
+        self._loss_preset_name = kwargs.pop("loss_preset_name", None)
+        self._loss_preset_data = kwargs.pop("loss_preset_data", None)
+        # Also handle when passed through overrides dict (ultralytics >=8.4)
+        overrides = kwargs.get("overrides") or (args[1] if len(args) > 1 else None) or {}
+        if isinstance(overrides, dict):
+            if self._loss_preset_name is None:
+                self._loss_preset_name = overrides.pop("loss_preset_name", None)
+            if self._loss_preset_data is None:
+                self._loss_preset_data = overrides.pop("loss_preset_data", None)
         super().__init__(*args, **kwargs)
         self._best_recall = 0.0
         self._best_f2 = 0.0
@@ -270,12 +280,12 @@ class RecallFocusedTrainer(DetectionTrainer):
         model = super().get_model(cfg=cfg, weights=weights, verbose=verbose)
         return model
 
-    def _setup_train(self, world_size):
-        super()._setup_train(world_size)
+    def _setup_train(self):
+        super()._setup_train()
 
-        # Retrieve loss preset passed via model.train() kwargs
-        loss_preset_name = getattr(self.args, "loss_preset_name", "default")
-        loss_preset_data = getattr(self.args, "loss_preset_data", None)
+        # Retrieve loss preset stashed in __init__ before ultralytics validated args
+        loss_preset_name = self._loss_preset_name or "default"
+        loss_preset_data = self._loss_preset_data
 
         print(f"\n[RecallFocusedTrainer] Active preset: {loss_preset_name}")
         print(get_loss_summary())
@@ -288,40 +298,44 @@ class RecallFocusedTrainer(DetectionTrainer):
         self.compute_loss = self.loss_fn
 
     # -- 2. Fb-based fitness -----------------------------------------------
-    def fitness(self) -> float:
-        """
-        Default ultralytics fitness:
-            w = [0.0, 0.0, 0.1, 0.9] x [P, R, mAP50, mAP50-95]
-            -> heavily mAP50-95 focused, recall weight = 0
+    def _metrics_to_prm(self, metrics: dict):
+        """Extract (P, R, mAP50, mAP50-95) from the metrics dict returned by validate()."""
+        P       = float(metrics.get("metrics/precision(B)", 0.0))
+        R       = float(metrics.get("metrics/recall(B)",    0.0))
+        map50   = float(metrics.get("metrics/mAP50(B)",     0.0))
+        map5095 = float(metrics.get("metrics/mAP50-95(B)",  0.0))
+        return P, R, map50, map5095
 
-        Ours:
-            fitness = 0.6 x Fb(P,R) + 0.3 x mAP50 + 0.1 x mAP50-95
-            -> recall-weighted via Fb, still checks box quality via mAP
+    def validate(self):
         """
-        results = self.metrics.mean_results()
-        P, R, map50, map5095 = results[0], results[1], results[2], results[3]
+        Override validate() to replace the default mAP-based fitness with F2.
+        validate() now returns (metrics_dict, fitness_float).
+        """
+        metrics, _ = super().validate()
+        if metrics is None:
+            return None, None
 
+        P, R, map50, map5095 = self._metrics_to_prm(metrics)
         fb = f_beta(P, R, beta=FITNESS_BETA)
         score = (
             FITNESS_WEIGHTS["f_beta"] * fb +
             FITNESS_WEIGHTS["map50"] * map50 +
             FITNESS_WEIGHTS["map5095"] * map5095
         )
-
         print(
             f"\n  [fitness] F{FITNESS_BETA}={fb:.4f}  P={P:.4f}  R={R:.4f}"
             f"  mAP50={map50:.4f}  mAP50-95={map5095:.4f}"
             f"  -> score={score:.4f}"
         )
-        return score
+        metrics["fitness"] = score
+        return metrics, score
 
     # -- 3. Extra checkpoints ----------------------------------------------
     def save_metrics(self, metrics: dict):
         """Called after each validation. Save extra best checkpoints."""
         super().save_metrics(metrics)
 
-        results = self.metrics.mean_results()
-        P, R, map50, map5095 = results[0], results[1], results[2], results[3]
+        P, R, map50, map5095 = self._metrics_to_prm(metrics)
         fb = f_beta(P, R, beta=FITNESS_BETA)
 
         wdir = Path(self.save_dir) / "weights"

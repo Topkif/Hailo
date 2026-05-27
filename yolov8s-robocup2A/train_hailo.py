@@ -55,7 +55,7 @@ from loss_function import (
 
 CFG = {
     # -- Dataset & project -------------------------------------------------
-    "data":         "Dataset/dataset.yaml",         # dataset yaml path
+    "data":         "../Dataset/dataset.yaml",         # dataset yaml path
     "project":      "yolov8s-robocup2A/runs/hailo_train",  # output folder
 
     # -- Model -------------------------------------------------------------
@@ -73,8 +73,8 @@ CFG = {
 
     # -- Hardware ----------------------------------------------------------
     "device":       "0",                # GPU id - use "cpu" if no GPU
-    "workers":      8,                  # data loader threads
-    "cache":        "ram",              # "ram" | "disk" | False
+    "workers":      4,                  # data loader threads (8 caused OOM on Windows spawn)
+    "cache":        "disk",             # "ram" causes OOM with mosaic aug; disk is safe
 }
 
 
