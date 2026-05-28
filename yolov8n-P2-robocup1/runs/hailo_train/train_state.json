@@ -1,4 +1,4 @@
 {
-  "last_completed": "high_recall",
-  "weights": "C:/Users/marin/Documents/Hailo/yolov8n-P2-robocup1/runs/detect/runs/hailo_train/high_recall/weights/best_f2.pt"
+  "last_completed": "color_invariance",
+  "weights": "C:\\Users\\marin\\Documents\\Hailo\\yolov8n-P2-robocup1\\runs\\hailo_train\\color_invariance\\weights\\best.pt"
 }
