@@ -343,15 +343,14 @@ class RecallFocusedTrainer(DetectionTrainer):
 
         if R > self._best_recall:
             self._best_recall = R
-            ckpt_path = wdir / "best_recall.pt"
-            self._save_ckpt(ckpt_path)
+            self._save_ckpt(wdir / "best_recall.pt")
             print(f"  [checkpoint] best_recall.pt updated  R={R:.4f}")
 
         if fb > self._best_f2:
             self._best_f2 = fb
-            ckpt_path = wdir / "best_f2.pt"
-            self._save_ckpt(ckpt_path)
-            print(f"  [checkpoint] best_f2.pt    updated  F{FITNESS_BETA}={fb:.4f}")
+            self._save_ckpt(wdir / "best_f2.pt")
+            self._save_ckpt(wdir / "best.pt")
+            print(f"  [checkpoint] best.pt + best_f2.pt updated  F{FITNESS_BETA}={fb:.4f}")
 
     def _save_ckpt(self, path: Path):
         """Save current model state to path."""

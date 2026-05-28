@@ -107,7 +107,7 @@ from loss_function import (
 CFG = {
     # -- Dataset & project -------------------------------------------------
     "data":         "../Dataset/dataset.yaml",         # dataset yaml path
-    "project":      "runs/hailo_train",  # output folder
+    "project":      str(Path(__file__).parent / "runs" / "hailo_train"),  # absolute so ultralytics doesn't prepend runs/detect/
 
     # -- Model -------------------------------------------------------------
     # YOLOv8n-P2: nano backbone (fast on Hailo8) with P2 head (stride 4)
