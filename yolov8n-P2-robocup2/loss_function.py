@@ -51,7 +51,7 @@ CLASS_CONFIG = {
     4: {"name": "tag_bleu",  "recall_weight": 1.0, "cls_weight": 1.0},
     5: {"name": "tag_rouge", "recall_weight": 1.0, "cls_weight": 1.0},
     6: {"name": "robot_rct", "recall_weight": 1.0, "cls_weight": 1.0},
-    7: {"name": "humain",    "recall_weight": 1.0, "cls_weight": 1.0},
+    7: {"name": "humain",    "recall_weight": 2.0, "cls_weight": 1.0}, # human must be detected well too
 }
 
 

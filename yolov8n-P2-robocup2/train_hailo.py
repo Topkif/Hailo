@@ -15,6 +15,7 @@ Usage:
   python train_hailo.py --from precision      # resume from "precision" phase
   python train_hailo.py --only export         # export only
   python train_hailo.py --only high_recall    # run single phase by name
+  python train_hailo.py --only sweep --weights <best.pt> # pour trouver le combo optimal sur ton dataset réel.
 
 Adding a new phase:
   1. Append a dict to PHASE_CONFIG
