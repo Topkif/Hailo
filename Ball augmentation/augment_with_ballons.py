@@ -8,7 +8,7 @@ dataset_augmented/ sans modifier l'original.
 Usage :
     python augment_with_ballons.py
     python augment_with_ballons.py --yaml ../Dataset/dataset.yaml --max 2 --seed 42
-"""
+""" 
 
 import argparse
 import math
@@ -49,8 +49,7 @@ AUGMENTATION_CONFIG: dict = {
     "chroma_strength": 0.25,        # 0=pas d'adaptation couleur, 1=copie exacte
     "aug_splits": ["train"],
     "output_dir": "dataset_augmented",
-    # "bank_dir": "balloon_bank",
-    "bank_dir": "filtered_bank",
+    "bank_dir": "Ballons",
     "random_seed": None,
     "jpeg_quality": 95,
     "min_placed_area_px": 16,
@@ -441,6 +440,7 @@ def augment_single_image(
     img_path: Path,
     label_path: Path | None,
     balloon_bank: list[np.ndarray],
+    bank_queue: list[int],
     ballon_idx: int,
     config: dict,
     rng: np.random.Generator,
@@ -483,9 +483,10 @@ def augment_single_image(
     placed_bboxes_abs: list[tuple[int, int, int, int]] = []  # (x1,y1,x2,y2) des ballons placés
 
     for _ in range(n_balloons):
-        # Pioche un RGBA dans la banque
-        bank_idx = int(rng.integers(0, len(balloon_bank)))
-        rgba = balloon_bank[bank_idx]
+        # Pioche le prochain ballon de la queue cyclique shufflée
+        if not bank_queue:
+            bank_queue.extend(rng.permutation(len(balloon_bank)).tolist())
+        rgba = balloon_bank[bank_queue.pop()]
 
         # Transformation géométrique
         angle = float(rng.uniform(config["rotation_min_deg"], config["rotation_max_deg"]))
@@ -624,11 +625,11 @@ def write_augmented_pair(
     out_labels_dir.mkdir(parents=True, exist_ok=True)
 
     cv2.imwrite(
-        str(out_images_dir / f"{src_stem}_aug.jpg"),
+        str(out_images_dir / f"{src_stem}.jpg"),
         aug_img,
         [cv2.IMWRITE_JPEG_QUALITY, jpeg_quality],
     )
-    (out_labels_dir / f"{src_stem}_aug.txt").write_text(
+    (out_labels_dir / f"{src_stem}.txt").write_text(
         "\n".join(label_lines), encoding="utf-8"
     )
 
@@ -733,6 +734,7 @@ def main() -> None:
     print(f"[2/5] Chargement de la banque : {args.bank}")
     balloon_bank = load_balloon_bank(args.bank)
     print(f"      {len(balloon_bank)} patches RGBA chargés")
+    bank_queue: list[int] = []  # queue cyclique shufflée — partagée sur tout le run
 
     output_root: Path = args.output
 
@@ -768,7 +770,7 @@ def main() -> None:
 
             result = augment_single_image(
                 img_path, label_path if label_path.exists() else None,
-                balloon_bank, ballon_idx, config, rng,
+                balloon_bank, bank_queue, ballon_idx, config, rng,
             )
 
             if result is None:
