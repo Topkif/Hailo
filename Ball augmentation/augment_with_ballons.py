@@ -54,6 +54,8 @@ AUGMENTATION_CONFIG: dict = {
     "random_seed": None,
     "jpeg_quality": 95,
     "min_placed_area_px": 16,
+    "min_balloon_size_px": 100,
+    "bbox_shrink_px": 5,
 }
 
 # ---------------------------------------------------------------------------
@@ -95,11 +97,21 @@ def load_dataset_config(yaml_path: Path) -> tuple[Path, dict[str, Path], int, li
 # Chargement de la banque
 # ---------------------------------------------------------------------------
 
+def crop_to_content(rgba: np.ndarray) -> np.ndarray:
+    """Crop an RGBA image to the bounding box of its non-transparent pixels."""
+    alpha = rgba[:, :, 3]
+    pts = cv2.findNonZero(alpha)
+    if pts is None:
+        return rgba
+    x, y, w, h = cv2.boundingRect(pts)
+    return rgba[y:y+h, x:x+w].copy()
+
+
 def load_balloon_bank(bank_dir: Path) -> list[np.ndarray]:
     """
     Charge tous les PNG RGBA de balloon_bank/.
 
-    Retourne une liste de tableaux uint8 (H, W, 4).
+    Retourne une liste de tableaux uint8 (H, W, 4), cropped to content.
     Lève FileNotFoundError si vide ou absent.
     """
     if not bank_dir.exists():
@@ -119,6 +131,7 @@ def load_balloon_bank(bank_dir: Path) -> list[np.ndarray]:
             continue
         # Convertir BGRA → RGBA pour cohérence interne
         img_rgba = cv2.cvtColor(img, cv2.COLOR_BGRA2RGBA)
+        img_rgba = crop_to_content(img_rgba)
         bank.append(img_rgba)
 
     if not bank:
@@ -452,6 +465,19 @@ def augment_single_image(
         config["balloons_per_image_max"] + 1,
     ))
 
+    # Parse existing labels into absolute pixel bboxes for occlusion checks
+    existing_bboxes_abs: list[tuple[int, int, int, int]] = []
+    for line in existing_lines:
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        cx_n, cy_n, w_n, h_n = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
+        ex1 = int((cx_n - w_n / 2) * img_w)
+        ey1 = int((cy_n - h_n / 2) * img_h)
+        ex2 = int((cx_n + w_n / 2) * img_w)
+        ey2 = int((cy_n + h_n / 2) * img_h)
+        existing_bboxes_abs.append((ex1, ey1, ex2, ey2))
+
     current_img = img.copy()
     added_lines: list[str] = []
     placed_bboxes_abs: list[tuple[int, int, int, int]] = []  # (x1,y1,x2,y2) des ballons placés
@@ -464,7 +490,23 @@ def augment_single_image(
         # Transformation géométrique
         angle = float(rng.uniform(config["rotation_min_deg"], config["rotation_max_deg"]))
         scale = float(rng.uniform(config["scale_min"], config["scale_max"]))
+
+        # Enforce minimum balloon size after rescaling
+        min_sz = config["min_balloon_size_px"]
+        src_h, src_w = rgba.shape[:2]
+        min_dim_after_scale = min(src_w, src_h) * scale
+        if min_dim_after_scale < min_sz:
+            scale = min_sz / min(src_w, src_h)
+
         warped_rgba, warped_alpha = transform_balloon_patch(rgba, angle, scale)
+
+        # Compute tight content bounds within the warped patch
+        content_pts = cv2.findNonZero(warped_alpha)
+        if content_pts is None:
+            continue
+        content_x, content_y, content_w, content_h = cv2.boundingRect(content_pts)
+        if content_w < min_sz or content_h < min_sz:
+            continue
 
         # Motion blur (probabiliste)
         patch_h, patch_w = warped_rgba.shape[:2]
@@ -491,22 +533,36 @@ def augment_single_image(
             continue  # patch trop grand pour l'image → on passe
 
         # Placement sans overlap — on essaie plusieurs positions
-        for _ in range(10):
+        for _ in range(20):
             cx = int(rng.integers(cx_min, cx_max + 1))
             cy = int(rng.integers(cy_min_abs, cy_max_abs + 1))
 
-            # Vérifier l'overlap avec les ballons déjà placés (IoU des bbox absolues)
+            # Vérifier l'overlap avec les ballons déjà placés (tight content bounds)
             ox_try = cx - patch_w // 2
             oy_try = cy - patch_h // 2
+            # Tight bbox of this balloon in image coordinates
+            try_x1 = ox_try + content_x
+            try_y1 = oy_try + content_y
+            try_x2 = try_x1 + content_w
+            try_y2 = try_y1 + content_h
             overlap = False
             for prev_bbox in placed_bboxes_abs:
                 px1, py1, px2, py2 = prev_bbox
-                ix1 = max(ox_try, px1); iy1 = max(oy_try, py1)
-                ix2 = min(ox_try + patch_w, px2); iy2 = min(oy_try + patch_h, py2)
+                ix1 = max(try_x1, px1); iy1 = max(try_y1, py1)
+                ix2 = min(try_x2, px2); iy2 = min(try_y2, py2)
                 if ix2 > ix1 and iy2 > iy1:
                     overlap = True
                     break
             if overlap:
+                continue
+
+            # Check if the balloon fully covers any existing object
+            occludes = False
+            for ex1, ey1, ex2, ey2 in existing_bboxes_abs:
+                if try_x1 <= ex1 and try_y1 <= ey1 and try_x2 >= ex2 and try_y2 >= ey2:
+                    occludes = True
+                    break
+            if occludes:
                 continue
 
             # Incrustation
@@ -530,8 +586,18 @@ def augment_single_image(
 
             current_img = composited
             bx, by, bw, bh = yolo_bbox
+            # Shrink bbox inward by configured pixels on each side
+            shrink = config["bbox_shrink_px"]
+            shrink_w = (shrink * 2) / img_w
+            shrink_h = (shrink * 2) / img_h
+            bw = max(0.001, bw - shrink_w)
+            bh = max(0.001, bh - shrink_h)
             added_lines.append(f"{ballon_idx} {bx:.6f} {by:.6f} {bw:.6f} {bh:.6f}")
-            placed_bboxes_abs.append((offset_x, offset_y, offset_x + patch_w, offset_y + patch_h))
+            # Store tight content bounds for overlap checks
+            placed_bboxes_abs.append((
+                offset_x + content_x, offset_y + content_y,
+                offset_x + content_x + content_w, offset_y + content_y + content_h,
+            ))
             break
 
     if not added_lines:
@@ -694,7 +760,7 @@ def main() -> None:
 
         for img_path in tqdm(img_paths, desc=f"  [{split}]", unit="img"):
             # Skip COCO-derived images whose names start with zeros (e.g. 000000123456 or 000000123456_1)
-            if img_path.stem.startswith('0'):
+            if img_path.stem.startswith('0000'):
                 skipped += 1
                 continue
             total += 1

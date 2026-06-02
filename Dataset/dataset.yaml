@@ -1,4 +1,4 @@
-﻿path: C:/Users/marin/Documents/Hailo/Dataset
+﻿path: C:/Users/marin/Documents/GitHub/Hailo/Dataset
 train: images/train
 val: images/val
 test: images/test
