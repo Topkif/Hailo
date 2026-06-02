@@ -1,0 +1,53 @@
+date    : 2026-05-31 19:22:07
+model   : .\yolov8n-p2-robocup2.pt
+conf    : 0.2   iou : 0.45
+
+[load] .\yolov8n-p2-robocup2.pt
+data    : ..\Dataset\dataset.yaml  (split: test)
+classes : ['robot', 'ballon', 'but', 'poteau', 'tag_bleu', 'tag_rouge', 'robot_rct', 'humain']
+
+[val] split='test' ...
+
+╔══════════════════════════════════════╗
+║         VALIDATION METRICS           ║
+╠══════════════════════════════════════╣
+║  Precision    :   0.9051               ║
+║  Recall       :   0.8361               ║
+║  F1           :   0.8692               ║
+║  F2 (recall²) :   0.8490               ║
+╠══════════════════════════════════════╣
+║  mAP@50       :   0.8485               ║
+║  mAP@50-95    :   0.6083               ║
+╚══════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                      PER-CLASS METRICS                                  ║
+╚══════════════════════════════════════════════════════════════════════════╝
+╔────────────────╦────────╦────────╦────────╦────────╦────────╦────────╗
+║ Class         ║  Prec  ║ Recall ║   F1   ║   F2   ║ AP@50  ║ mAP95  ║
+╠────────────────╬════════╬════════╬════════╬════════╬════════╬════════╣
+║ robot (x0)    ║ 0.7036 ║ 0.5357 ║ 0.6083 ║ 0.5625 ║ 0.6010 ║ 0.3849 ║
+║ ballon (x0)   ║ 0.9953 ║ 0.9600 ║ 0.9773 ║ 0.9669 ║ 0.9550 ║ 0.7459 ║
+║ but (x0)      ║ 0.8968 ║ 0.8929 ║ 0.8948 ║ 0.8937 ║ 0.8935 ║ 0.7786 ║
+║ poteau (x0)   ║ 0.9761 ║ 0.9078 ║ 0.9407 ║ 0.9207 ║ 0.9074 ║ 0.5443 ║
+║ tag_bleu (x0) ║ 0.8889 ║ 0.8889 ║ 0.8889 ║ 0.8889 ║ 0.8850 ║ 0.5852 ║
+║ tag_rouge (x0)║ 0.9085 ║ 0.6957 ║ 0.7880 ║ 0.7299 ║ 0.6874 ║ 0.3316 ║
+║ robot_rct (x0)║ 0.9267 ║ 1.0000 ║ 0.9620 ║ 0.9844 ║ 0.9950 ║ 0.8772 ║
+║ humain (x0)   ║ 0.9450 ║ 0.8079 ║ 0.8711 ║ 0.8320 ║ 0.8641 ║ 0.6190 ║
+╠────────────────╬════════╬════════╬════════╬════════╬════════╬════════╣
+║ ALL (mean)    ║ 0.9051 ║ 0.8361 ║ 0.8692 ║ 0.8490 ║ 0.8485 ║ 0.6083 ║
+╚────────────────╩════════╩════════╩════════╩════════╩════════╩════════╝
+
+── Metric definitions ───────────────────────────────────────────
+  Precision  : of all detections made, % that were correct (low = ghost detections)
+  Recall     : of all real objects in scene, % the model found (low = missed objects)
+  F1         : harmonic mean of P and R — balanced score
+  F2         : recall-weighted score — missing an object counts 2x more than a false alarm
+  AP@50      : per-class average precision at IoU=0.50 (lenient box match)
+  mAP@50-95  : per-class mean AP across IoU thresholds 0.50→0.95 (strict box precision)
+─────────────────────────────────────────────────────────────────
+
+[annotate] 87 images from test split → C:\Users\marin\Documents\Hailo\yolov8n-P2-robocup2\test_annotation/
+
+  Total images     : 87
+  Total detections : 461
